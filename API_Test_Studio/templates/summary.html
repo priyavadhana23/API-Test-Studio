@@ -1,0 +1,67 @@
+{# ── Executive Summary Section ─────────────────────────── #}
+{% if exec_summary %}
+<section class="section" id="executive-summary">
+  <h2 class="section-title">Executive Summary</h2>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-value">{{ exec_summary.total_endpoints }}</div>
+      <div class="kpi-label">Endpoints</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value">{{ exec_summary.total_test_cases }}</div>
+      <div class="kpi-label">Test Cases</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value">{{ exec_summary.total_executed }}</div>
+      <div class="kpi-label">Executed</div>
+    </div>
+    <div class="kpi-card kpi-pass">
+      <div class="kpi-value">{{ exec_summary.passed }}</div>
+      <div class="kpi-label">Passed</div>
+    </div>
+    <div class="kpi-card kpi-fail">
+      <div class="kpi-value">{{ exec_summary.failed }}</div>
+      <div class="kpi-label">Failed</div>
+    </div>
+    <div class="kpi-card kpi-error">
+      <div class="kpi-value">{{ exec_summary.errors }}</div>
+      <div class="kpi-label">Errors</div>
+    </div>
+    <div class="kpi-card kpi-pass">
+      <div class="kpi-value">{{ exec_summary.pass_percentage | fmt_pct }}</div>
+      <div class="kpi-label">Pass Rate</div>
+    </div>
+    <div class="kpi-card kpi-health">
+      <div class="kpi-value">{{ exec_summary.health_score | fmt_float(1) }}</div>
+      <div class="kpi-label">Health Score</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value">{{ exec_summary.avg_response_time_ms | fmt_ms }}</div>
+      <div class="kpi-label">Avg Response</div>
+    </div>
+  </div>
+
+  <!-- Detail table -->
+  <div class="card" style="margin-top:20px;">
+    <table class="info-table">
+      <tr><td>API Name</td><td><strong>{{ exec_summary.api_name }}</strong></td></tr>
+      <tr><td>API Version</td><td>{{ exec_summary.api_version | default('—') }}</td></tr>
+      <tr><td>Execution Date</td><td>{{ exec_summary.execution_date }}</td></tr>
+      <tr><td>Environment</td><td>{{ exec_summary.environment }}</td></tr>
+      <tr><td>Specification File</td><td>{{ exec_summary.specification_file | default('—') }}</td></tr>
+      <tr><td>Total Execution Time</td><td>{{ exec_summary.total_execution_time_s | fmt_sec }}</td></tr>
+      <tr><td>Framework Version</td><td>{{ exec_summary.framework_version }}</td></tr>
+      <tr>
+        <td>Health Rating</td>
+        <td>
+          <span class="badge {{ exec_summary.health_rating | rating_class }}">
+            {{ exec_summary.health_rating }}
+          </span>
+        </td>
+      </tr>
+    </table>
+  </div>
+</section>
+{% endif %}

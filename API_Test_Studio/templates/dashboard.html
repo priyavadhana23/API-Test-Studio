@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{# ── Executive Summary ─────────────────────────────────── #}
+{% include "summary.html" %}
+
+{# ── Analytics Insights ────────────────────────────────── #}
+{% if analytics %}
+<section class="section" id="analytics">
+  <h2 class="section-title">Analytics Insights</h2>
+  <div class="card">
+    <table class="info-table">
+      {% if analytics.health %}
+      <tr>
+        <td>Health Score</td>
+        <td>
+          <strong>{{ analytics.health.score | fmt_float(1) }} / 100</strong>
+          &nbsp;
+          <span class="badge {{ analytics.health.rating | rating_class }}">
+            {{ analytics.health.rating }}
+          </span>
+        </td>
+      </tr>
+      {% endif %}
+      {% if analytics.endpoint_analysis %}
+      {% set ep = analytics.endpoint_analysis %}
+      <tr><td>Most Executed Endpoint</td><td><code>{{ ep.most_executed | default('—') }}</code></td></tr>
+      <tr><td>Most Failed Endpoint</td><td><code>{{ ep.most_failed | default('—') }}</code></td></tr>
+      <tr><td>Fastest Endpoint</td><td><code>{{ ep.fastest | default('—') }}</code></td></tr>
+      <tr><td>Slowest Endpoint</td><td><code>{{ ep.slowest | default('—') }}</code></td></tr>
+      {% endif %}
+      {% if analytics.response_time %}
+      {% set rt = analytics.response_time %}
+      <tr><td>Avg Response Time</td><td>{{ rt.mean_ms | fmt_ms }}</td></tr>
+      <tr><td>P95 Response Time</td><td>{{ rt.p95_ms | fmt_ms }}</td></tr>
+      <tr><td>P99 Response Time</td><td>{{ rt.p99_ms | fmt_ms }}</td></tr>
+      <tr><td>SLA Compliance (≤{{ rt.sla_threshold_ms | fmt_ms }})</td>
+          <td>{{ rt.sla_compliance_pct | fmt_pct }}</td></tr>
+      {% endif %}
+      {% if analytics.regression %}
+      <tr>
+        <td>Regression Status</td>
+        <td>
+          {% if analytics.regression.has_regression %}
+          <span style="color:var(--fail);font-weight:700;">⚠ Regression Detected</span>
+          {% else %}
+          <span style="color:var(--pass);font-weight:700;">✅ No Regression</span>
+          {% endif %}
+          &nbsp;—&nbsp; {{ analytics.regression.verdict }}
+        </td>
+      </tr>
+      {% endif %}
+      {% if analytics.trend %}
+      <tr>
+        <td>Execution Trend</td>
+        <td>
+          {{ analytics.trend.direction | title }}
+          (slope: {{ analytics.trend.slope | fmt_float(4) }})
+        </td>
+      </tr>
+      {% endif %}
+    </table>
+  </div>
+
+  {# Health Recommendations #}
+  {% if analytics.health and analytics.health.recommendations %}
+  <div class="card" style="margin-top:16px;">
+    <h3 style="margin-bottom:14px;font-size:15px;">Recommendations</h3>
+    <ul class="rec-list">
+      {% for rec in analytics.health.recommendations %}
+      <li>{{ rec }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{# ── Charts ────────────────────────────────────────────── #}
+{% if charts %}
+<section class="section" id="charts">
+  <h2 class="section-title">Charts &amp; Visualisations</h2>
+  <div class="chart-grid">
+    {% for chart_id, chart in charts.items() %}
+    <div class="chart-card">
+      {{ chart.html | safe }}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# ── Failure Analysis ──────────────────────────────────── #}
+{% if analytics and analytics.failure_analysis and analytics.failure_analysis.total_failures > 0 %}
+<section class="section" id="failures">
+  <h2 class="section-title">Failure Analysis</h2>
+  {% set fa = analytics.failure_analysis %}
+  <div class="kpi-grid">
+    <div class="kpi-card kpi-fail"><div class="kpi-value">{{ fa.total_failures }}</div><div class="kpi-label">Total Failures</div></div>
+    <div class="kpi-card"><div class="kpi-value">{{ fa.validation_failures }}</div><div class="kpi-label">Validation</div></div>
+    <div class="kpi-card kpi-error"><div class="kpi-value">{{ fa.execution_errors }}</div><div class="kpi-label">Exec Errors</div></div>
+    <div class="kpi-card"><div class="kpi-value">{{ fa.auth_failures }}</div><div class="kpi-label">Auth Failures</div></div>
+    <div class="kpi-card"><div class="kpi-value">{{ fa.schema_failures }}</div><div class="kpi-label">Schema</div></div>
+    <div class="kpi-card"><div class="kpi-value">{{ fa.timeout_failures }}</div><div class="kpi-label">Timeouts</div></div>
+  </div>
+  {% if fa.top_failures %}
+  <div class="card" style="margin-top:16px;">
+    <h3 style="margin-bottom:14px;font-size:15px;">Top Failure Messages</h3>
+    <table class="data-table">
+      <thead><tr><th>#</th><th>Count</th><th>%</th><th>Message</th></tr></thead>
+      <tbody>
+        {% for f in fa.top_failures[:10] %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ f.count }}</td>
+          <td>{{ f.percentage | fmt_pct }}</td>
+          <td title="{{ f.sample_message }}">{{ f.category | truncate_url(100) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{# ── Endpoint Table ────────────────────────────────────── #}
+{% if analytics and analytics.endpoint_analysis and analytics.endpoint_analysis.all_stats %}
+<section class="section" id="endpoints">
+  <h2 class="section-title">Endpoint Statistics</h2>
+  <div class="card">
+    <div class="data-table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Method</th><th>Endpoint</th><th>Executions</th>
+            <th>Passed</th><th>Failed</th><th>Pass Rate</th>
+            <th>Avg RT</th><th>P95 RT</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ep in analytics.endpoint_analysis.all_stats %}
+          <tr>
+            <td><code>{{ ep.method }}</code></td>
+            <td title="{{ ep.endpoint }}">{{ ep.endpoint | truncate_url(32) }}</td>
+            <td>{{ ep.total_executions }}</td>
+            <td class="status-pass">{{ ep.passed }}</td>
+            <td class="status-fail">{{ ep.failed }}</td>
+            <td>
+              <span class="{{ 'status-pass' if ep.pass_rate >= 80 else ('status-fail' if ep.pass_rate < 50 else 'status-error') }}">
+                {{ ep.pass_rate | fmt_pct }}
+              </span>
+            </td>
+            <td>{{ ep.avg_response_time_ms | fmt_ms }}</td>
+            <td>{{ ep.p95_response_time_ms | fmt_ms }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# ── Validator Statistics + Detailed Results ──────────── #}
+{% include "tables.html" %}
+
+{# ── Comparison ────────────────────────────────────────── #}
+{% include "comparison.html" %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Table Search, Filter & Sort ────────────────────────
+function filterTable() {
+  const search = (document.getElementById('searchInput') || {value:''}).value.toLowerCase();
+  const status = (document.getElementById('statusFilter') || {value:''}).value.toLowerCase();
+  const cat    = (document.getElementById('categoryFilter') || {value:''}).value.toLowerCase();
+  const tbody  = document.getElementById('tableBody');
+  if (!tbody) return;
+  const rows   = tbody.querySelectorAll('tr');
+  let shown    = 0;
+  rows.forEach(row => {
+    const text   = row.textContent.toLowerCase();
+    const cells  = row.querySelectorAll('td');
+    const rowStatus = cells[6] ? cells[6].textContent.trim().toLowerCase() : '';
+    const rowCat    = cells[3] ? cells[3].textContent.trim().toLowerCase() : '';
+    const visible = (!search || text.includes(search))
+                 && (!status || rowStatus.includes(status))
+                 && (!cat    || rowCat.includes(cat));
+    row.style.display = visible ? '' : 'none';
+    if (visible) shown++;
+  });
+  const countEl = document.getElementById('rowCount');
+  if (countEl) countEl.textContent = `Showing ${shown} of ${rows.length} results`;
+}
+
+let sortDir = {};
+function sortTable(colIdx) {
+  const table = document.getElementById('resultsTable');
+  if (!table) return;
+  const tbody = table.querySelector('tbody');
+  const rows  = Array.from(tbody.querySelectorAll('tr'));
+  sortDir[colIdx] = !sortDir[colIdx];
+  rows.sort((a, b) => {
+    const ta = a.cells[colIdx] ? a.cells[colIdx].textContent.trim() : '';
+    const tb = b.cells[colIdx] ? b.cells[colIdx].textContent.trim() : '';
+    const na = parseFloat(ta), nb = parseFloat(tb);
+    const cmp = (!isNaN(na) && !isNaN(nb)) ? (na - nb) : ta.localeCompare(tb);
+    return sortDir[colIdx] ? cmp : -cmp;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+</script>
+{% endblock %}

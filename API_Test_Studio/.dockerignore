@@ -1,0 +1,75 @@
+# =============================================================================
+# API Test Studio — .dockerignore
+# Keeps the build context lean and prevents secrets / caches from entering
+# the image. Listed in order: Python → Node → Git → IDE → data.
+# =============================================================================
+
+# ── Python cache & virtual environment ───────────────────────────────────────
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Node / frontend ───────────────────────────────────────────────────────────
+web_dashboard/frontend/node_modules/
+web_dashboard/frontend/dist/
+web_dashboard/frontend/.vite/
+
+# ── Git ────────────────────────────────────────────────────────────────────────
+.git/
+.gitignore
+.gitattributes
+
+# ── IDE & editor ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Generated / runtime data (use volumes at runtime instead) ────────────────
+reports/
+logs/
+history/
+database/*.db
+
+# ── Uploaded specs (should be provided at runtime via volume) ────────────────
+uploaded_specs/
+
+# ── Docker files themselves (no need to copy into the image) ─────────────────
+Dockerfile
+.dockerignore
+docker/
+
+# ── Documentation ─────────────────────────────────────────────────────────────
+README.md
+*.md
+
+# ── Environment files (never bake secrets into the image) ────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Temporary / test / scratch files ─────────────────────────────────────────
+_check_*.py
+_verify_*.py
+_audit_*.py
+_import_check.py
+_test_startup.py
+tempCodeRunnerFile.py
+
+# ── pytest / coverage ────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/

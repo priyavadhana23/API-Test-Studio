@@ -1,0 +1,47 @@
+# =============================================================================
+# API Test Studio — Frontend .dockerignore
+# Keeps the Docker build context small. Only source files needed to build
+# the Vite app are sent to the daemon.
+# =============================================================================
+
+# ── Build output (Stage 2 copies from the build stage, not the host) ─────────
+dist/
+.vite/
+
+# ── Node modules (reinstalled inside the container with npm ci) ───────────────
+node_modules/
+
+# ── Git ───────────────────────────────────────────────────────────────────────
+.git/
+.gitignore
+.gitattributes
+
+# ── IDE & OS ──────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+
+# ── TypeScript incremental build info ────────────────────────────────────────
+tsconfig.tsbuildinfo
+
+# ── Environment files (never bake secrets into the image) ────────────────────
+.env
+.env.local
+.env.*.local
+# .env.example is intentionally NOT excluded — it's documentation only
+
+# ── Docker files themselves ───────────────────────────────────────────────────
+Dockerfile
+.dockerignore
+
+# ── Documentation ─────────────────────────────────────────────────────────────
+README.md
+*.md

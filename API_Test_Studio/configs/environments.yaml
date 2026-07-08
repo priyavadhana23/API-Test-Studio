@@ -1,0 +1,55 @@
+# =============================================================================
+# API Test Studio - Environments Configuration
+# =============================================================================
+# Define one block per environment. The active environment is selected via
+# the `active_environment` key in config.yaml.
+#
+# Each environment block must provide:
+#   base_url      - The root URL of the API under test
+#   auth_type     - none | api_key | bearer | basic | oauth2
+#   headers       - Default HTTP headers to include with every request
+#   variables     - Environment-specific variable substitutions
+# =============================================================================
+
+development:
+  name: "Development"
+  base_url: "http://localhost:8000"
+  auth_type: "none"
+  headers:
+    Content-Type: "application/json"
+    Accept: "application/json"
+  variables:
+    api_version: "v1"
+    timeout: 30
+
+staging:
+  name: "Staging"
+  base_url: "https://staging.example.com"
+  auth_type: "bearer"
+  headers:
+    Content-Type: "application/json"
+    Accept: "application/json"
+  variables:
+    api_version: "v1"
+    timeout: 30
+
+production:
+  name: "Production"
+  base_url: "https://api.example.com"
+  auth_type: "bearer"
+  headers:
+    Content-Type: "application/json"
+    Accept: "application/json"
+  variables:
+    api_version: "v1"
+    timeout: 30
+
+# Template for adding new environments:
+# <env_name>:
+#   name: "<Human Readable Name>"
+#   base_url: "<base URL>"
+#   auth_type: "none | api_key | bearer | basic | oauth2"
+#   headers:
+#     Content-Type: "application/json"
+#   variables:
+#     key: "value"

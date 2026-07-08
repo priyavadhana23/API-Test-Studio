@@ -1,0 +1,518 @@
+# =============================================================================
+# API Test Studio — Continuous Integration
+# =============================================================================
+#
+# Three jobs run in parallel, then a final summary gate:
+#
+#   backend  ──┐
+#   frontend ──┼──► ci-gate (all-green check)
+#   docker   ──┘
+#
+# Jobs are fully independent and run concurrently for maximum speed.
+# The ci-gate job blocks merging if any upstream job fails.
+#
+# Triggers:
+#   • push          → main, master, develop
+#   • pull_request  → main, master, develop
+#   • workflow_dispatch (manual run from the GitHub Actions UI)
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  workflow_dispatch:
+
+# Cancel in-flight runs for the same branch to save runner minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Minimal default permissions — jobs escalate only as needed.
+permissions:
+  contents: read
+
+# ---------------------------------------------------------------------------
+# Shared env available to all jobs
+# ---------------------------------------------------------------------------
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION:   "22"
+  # Disable pip's progress bar and upgrade prompts in CI logs
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PIP_NO_COLOR: "1"
+
+# ===========================================================================
+# JOB 1 — Backend
+# ===========================================================================
+jobs:
+  backend:
+    name: Backend (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version: ["3.12"]
+
+    defaults:
+      run:
+        working-directory: API_Test_Studio   # all steps run from this dir
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Set up Python ───────────────────────────────────────────────────
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: API_Test_Studio/requirements.txt
+
+      # ── 3. Install dependencies ────────────────────────────────────────────
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      # ── 4. Validate critical files exist ──────────────────────────────────
+      - name: Validate repository structure
+        run: |
+          echo "Checking required files and directories..."
+          files=(
+            "requirements.txt"
+            "app.py"
+            "Dockerfile"
+            "docker-compose.yml"
+            ".env.example"
+          )
+          dirs=(
+            "api_parser"
+            "testcase_generator"
+            "executor"
+            "validators"
+            "database"
+            "analytics"
+            "reporting"
+            "configs"
+            "constants"
+            "models"
+            "utilities"
+            "exceptions"
+            "interfaces"
+            "web_dashboard/backend"
+          )
+          missing=0
+          for f in "${files[@]}"; do
+            if [ ! -f "$f" ]; then
+              echo "  MISSING FILE: $f"
+              missing=$((missing+1))
+            else
+              echo "  OK  $f"
+            fi
+          done
+          for d in "${dirs[@]}"; do
+            if [ ! -d "$d" ]; then
+              echo "  MISSING DIR: $d"
+              missing=$((missing+1))
+            else
+              echo "  OK  $d/"
+            fi
+          done
+          if [ $missing -gt 0 ]; then
+            echo "::error::$missing required file(s)/directory(ies) missing."
+            exit 1
+          fi
+          echo "All required files and directories present."
+
+      # ── 5. Verify all framework imports ───────────────────────────────────
+      - name: Verify Python imports
+        run: |
+          python - <<'EOF'
+          import sys
+          sys.path.insert(0, ".")
+          results = []
+
+          def chk(label, mod):
+              try:
+                  __import__(mod)
+                  results.append(("OK", label))
+              except Exception as e:
+                  results.append(("FAIL", f"{label}: {e}"))
+
+          # Core dependencies
+          chk("fastapi",      "fastapi")
+          chk("uvicorn",      "uvicorn")
+          chk("pydantic",     "pydantic")
+          chk("requests",     "requests")
+          chk("jinja2",       "jinja2")
+          chk("jsonschema",   "jsonschema")
+          chk("plotly",       "plotly")
+          chk("reportlab",    "reportlab")
+          chk("yaml",         "yaml")
+          chk("aiofiles",     "aiofiles")
+
+          # Framework modules
+          chk("configs",            "configs")
+          chk("api_parser",         "api_parser")
+          chk("testcase_generator", "testcase_generator")
+          chk("executor",           "executor")
+          chk("validators",         "validators")
+          chk("database",           "database")
+          chk("analytics",          "analytics")
+          chk("reporting",          "reporting")
+          chk("utilities",          "utilities")
+          chk("constants",          "constants")
+          chk("models",             "models")
+          chk("exceptions",         "exceptions")
+          chk("interfaces",         "interfaces")
+
+          failed = [r for r in results if r[0] == "FAIL"]
+          for status, label in results:
+              icon = "✓" if status == "OK" else "✗"
+              print(f"  [{icon}] {label}")
+          if failed:
+              print(f"\n{len(failed)} import(s) failed.")
+              sys.exit(1)
+          print(f"\nAll {len(results)} imports OK.")
+          EOF
+
+      # ── 6. Verify FastAPI application loads and exports all routes ─────────
+      - name: Verify FastAPI application startup
+        run: |
+          python - <<'EOF'
+          import sys
+          sys.path.insert(0, ".")
+          from web_dashboard.backend.main import app
+          schema = app.openapi()
+          paths  = schema.get("paths", {})
+          count  = sum(len(v) for v in paths.values())
+          print(f"FastAPI app loaded OK — {count} endpoints registered:")
+          for path in sorted(paths.keys()):
+              methods = ", ".join(sorted(paths[path].keys())).upper()
+              print(f"  {methods:<30} {path}")
+          assert count >= 19, f"Expected ≥19 endpoints, got {count}"
+          print(f"\nEndpoint count: {count}  ✓")
+          EOF
+
+      # ── 7. Validate Pydantic schemas parse cleanly ─────────────────────────
+      - name: Validate backend schemas
+        run: |
+          python - <<'EOF'
+          import sys
+          sys.path.insert(0, ".")
+          from web_dashboard.backend.schemas import (
+              runs, analytics, health, common, specs, results, jobs
+          )
+          print("All backend schema modules imported successfully.")
+          # Confirm key models exist
+          assert hasattr(runs,      "RunSummary")
+          assert hasattr(analytics, "AnalyticsSummarySchema")
+          assert hasattr(health,    "HealthResponse")
+          assert hasattr(jobs,      "JobRequest")
+          assert hasattr(results,   "TestCaseResultSchema")
+          print("Key Pydantic models verified.")
+          EOF
+
+      # ── 8. Validate config loads ───────────────────────────────────────────
+      - name: Validate configuration
+        run: |
+          python - <<'EOF'
+          import sys
+          sys.path.insert(0, ".")
+          from configs.config_loader import Config
+          cfg = Config()
+          envs = cfg.list_environments()
+          assert len(envs) > 0, "No environments configured"
+          print(f"Config loaded OK — environments: {envs}")
+          EOF
+
+      # ── 9. Upload backend verification log as artifact ────────────────────
+      - name: Collect backend verification summary
+        if: always()
+        run: |
+          python - <<'EOF' | tee backend-verification.txt
+          import sys, json, subprocess
+          sys.path.insert(0, ".")
+          from configs.config_loader import Config
+          from web_dashboard.backend.main import app
+          cfg = Config()
+          schema = app.openapi()
+          endpoints = sum(len(v) for v in schema.get("paths",{}).values())
+          print(f"API Test Studio — Backend Verification Summary")
+          print(f"================================================")
+          print(f"Python:      {sys.version.split()[0]}")
+          print(f"FastAPI:     OK")
+          print(f"Endpoints:   {endpoints}")
+          print(f"Environments: {cfg.list_environments()}")
+          EOF
+
+      - name: Upload backend artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-verification-${{ github.run_number }}
+          path: API_Test_Studio/backend-verification.txt
+          retention-days: 30
+
+  # ===========================================================================
+  # JOB 2 — Frontend
+  # ===========================================================================
+  frontend:
+    name: Frontend (Node ${{ env.NODE_VERSION }})
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: API_Test_Studio/web_dashboard/frontend
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Validate frontend files exist ──────────────────────────────────
+      - name: Validate frontend structure
+        working-directory: API_Test_Studio/web_dashboard/frontend
+        run: |
+          echo "Checking frontend required files..."
+          files=(
+            "package.json"
+            "package-lock.json"
+            "tsconfig.json"
+            "vite.config.ts"
+            "index.html"
+            "Dockerfile"
+            "nginx.conf"
+            ".env.example"
+            "src/App.tsx"
+            "src/main.tsx"
+          )
+          missing=0
+          for f in "${files[@]}"; do
+            if [ ! -f "$f" ]; then
+              echo "  MISSING: $f"
+              missing=$((missing+1))
+            else
+              echo "  OK  $f"
+            fi
+          done
+          if [ $missing -gt 0 ]; then
+            echo "::error::$missing frontend file(s) missing."
+            exit 1
+          fi
+
+      # ── 3. Set up Node.js ──────────────────────────────────────────────────
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: API_Test_Studio/web_dashboard/frontend/package-lock.json
+
+      # ── 4. Install dependencies (clean install — respects lock file) ───────
+      - name: Install Node dependencies
+        run: npm ci
+
+      # ── 5. TypeScript type check ───────────────────────────────────────────
+      - name: TypeScript type check
+        run: npm run typecheck
+
+      # ── 6. Production build ────────────────────────────────────────────────
+      - name: Production build (tsc + vite build)
+        run: npm run build
+
+      # ── 7. Verify build output ────────────────────────────────────────────
+      - name: Verify build output
+        run: |
+          echo "Checking dist/ output..."
+          if [ ! -f "dist/index.html" ]; then
+            echo "::error::dist/index.html not found after build."
+            exit 1
+          fi
+          js_count=$(ls dist/assets/*.js 2>/dev/null | wc -l | tr -d ' ')
+          if [ "$js_count" -lt 1 ]; then
+            echo "::error::No JS bundles found in dist/assets/"
+            exit 1
+          fi
+          total_size=$(du -sh dist/ | cut -f1)
+          echo "  dist/index.html     OK"
+          echo "  JS chunks:          $js_count"
+          echo "  Total dist size:    $total_size"
+          echo "Build output verified."
+
+      # ── 8. Upload production build as artifact ────────────────────────────
+      - name: Upload frontend build artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist-${{ github.run_number }}
+          path: API_Test_Studio/web_dashboard/frontend/dist/
+          retention-days: 7
+
+  # ===========================================================================
+  # JOB 3 — Docker
+  # ===========================================================================
+  docker:
+    name: Docker Validation
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: API_Test_Studio
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Validate all Docker files exist ────────────────────────────────
+      - name: Validate Docker file structure
+        run: |
+          echo "Checking Docker-related files..."
+          files=(
+            "Dockerfile"
+            ".dockerignore"
+            "docker-compose.yml"
+            ".env.example"
+            ".env.docker.example"
+            "web_dashboard/frontend/Dockerfile"
+            "web_dashboard/frontend/.dockerignore"
+            "web_dashboard/frontend/nginx.conf"
+            "docker/README_BACKEND.md"
+            "docker/README_FRONTEND.md"
+            "docker/README_COMPOSE.md"
+          )
+          missing=0
+          for f in "${files[@]}"; do
+            if [ ! -f "$f" ]; then
+              echo "  MISSING: $f"
+              missing=$((missing+1))
+            else
+              echo "  OK  $f"
+            fi
+          done
+          if [ $missing -gt 0 ]; then
+            echo "::error::$missing Docker file(s) missing."
+            exit 1
+          fi
+
+      # ── 3. Validate docker-compose.yml syntax ─────────────────────────────
+      - name: Validate docker-compose.yml syntax
+        run: |
+          docker compose config > /dev/null
+          echo "docker-compose.yml syntax: OK"
+
+      # ── 4. Validate compose service count ─────────────────────────────────
+      - name: Verify Compose services
+        run: |
+          services=$(docker compose config --services)
+          echo "Compose services:"
+          echo "$services" | while read svc; do echo "  $svc"; done
+          count=$(echo "$services" | wc -l | tr -d ' ')
+          if [ "$count" -lt 2 ]; then
+            echo "::error::Expected ≥2 Compose services (backend + frontend), found $count"
+            exit 1
+          fi
+          echo "Service count: $count  ✓"
+
+      # ── 5. Build backend Docker image ─────────────────────────────────────
+      - name: Build backend Docker image
+        run: |
+          docker build \
+            --tag api-test-studio-backend:ci \
+            --file Dockerfile \
+            . 2>&1 | tail -5
+          echo "Backend Docker build: OK"
+
+      # ── 6. Smoke-test the backend image (no long-running server) ──────────
+      - name: Smoke-test backend image (import check)
+        run: |
+          docker run --rm \
+            api-test-studio-backend:ci \
+            python -c "
+          import sys
+          sys.path.insert(0, '.')
+          from web_dashboard.backend.main import app
+          schema = app.openapi()
+          n = sum(len(v) for v in schema.get('paths',{}).values())
+          print(f'Backend smoke-test OK — {n} endpoints')
+          assert n >= 19, f'Expected >=19 endpoints, got {n}'
+          "
+          echo "Backend smoke-test: OK"
+
+      # ── 7. Build frontend Docker image ────────────────────────────────────
+      - name: Build frontend Docker image
+        run: |
+          docker build \
+            --tag api-test-studio-frontend:ci \
+            --file web_dashboard/frontend/Dockerfile \
+            web_dashboard/frontend/ 2>&1 | tail -5
+          echo "Frontend Docker build: OK"
+
+      # ── 8. Smoke-test the frontend image ──────────────────────────────────
+      - name: Smoke-test frontend image (nginx config check)
+        run: |
+          # Verify nginx config is valid inside the built image
+          docker run --rm api-test-studio-frontend:ci \
+            nginx -t 2>&1
+          echo "Frontend Nginx config: OK"
+
+      # ── 9. Verify frontend dist inside image ──────────────────────────────
+      - name: Verify frontend dist files in image
+        run: |
+          files=$(docker run --rm api-test-studio-frontend:ci \
+            ls /usr/share/nginx/html/)
+          echo "Nginx web root contents:"
+          echo "$files" | while read f; do echo "  $f"; done
+          # Must contain index.html
+          echo "$files" | grep -q "index.html" || {
+            echo "::error::index.html not found in Nginx web root"
+            exit 1
+          }
+          echo "Frontend dist verification: OK"
+
+      # ── 10. Image size report ─────────────────────────────────────────────
+      - name: Report image sizes
+        run: |
+          echo "=== Docker Image Sizes ==="
+          docker images --format "  {{.Repository}}:{{.Tag}}  {{.Size}}" \
+            | grep "api-test-studio"
+
+      # ── 11. Cleanup CI images ─────────────────────────────────────────────
+      - name: Remove CI Docker images
+        if: always()
+        run: |
+          docker rmi api-test-studio-backend:ci  2>/dev/null || true
+          docker rmi api-test-studio-frontend:ci 2>/dev/null || true
+          echo "CI images removed."
+
+  # ===========================================================================
+  # JOB 4 — CI Gate (final all-green check)
+  # ===========================================================================
+  ci-gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, docker]
+    if: always()
+
+    steps:
+      - name: Check all jobs passed
+        run: |
+          echo "Job results:"
+          echo "  backend:  ${{ needs.backend.result }}"
+          echo "  frontend: ${{ needs.frontend.result }}"
+          echo "  docker:   ${{ needs.docker.result }}"
+
+          if [[ "${{ needs.backend.result }}"  != "success" ||
+                "${{ needs.frontend.result }}" != "success" ||
+                "${{ needs.docker.result }}"   != "success" ]]; then
+            echo "::error::One or more CI jobs failed. See individual job logs."
+            exit 1
+          fi
+          echo ""
+          echo "All CI jobs passed. API Test Studio is verified."

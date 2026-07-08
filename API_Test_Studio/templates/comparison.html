@@ -1,0 +1,105 @@
+{# ── Comparison Report Section ────────────────────────── #}
+{% if comparison %}
+<section class="section" id="comparison">
+  <h2 class="section-title">Run Comparison</h2>
+
+  <!-- Verdict Banner -->
+  <div class="verdict-box {{ 'regression' if comparison.has_regression else 'no-regression' }}">
+    <strong>{{ '⚠ Regression Detected' if comparison.has_regression else '✅ No Regression' }}</strong>
+    &nbsp;&mdash;&nbsp; {{ comparison.verdict }}
+  </div>
+
+  <!-- Side-by-side metrics -->
+  <div class="comparison-grid">
+    <div class="card">
+      <h3 style="margin-bottom:14px;color:#566573;font-size:13px;text-transform:uppercase;">
+        Baseline Run
+      </h3>
+      <table class="info-table">
+        <tr><td>Run ID</td><td>{{ comparison.run_id_baseline | short_id }}</td></tr>
+        <tr><td>Timestamp</td><td>{{ comparison.timestamp_baseline[:19] }}</td></tr>
+        <tr><td>Passed</td><td class="status-pass">{{ comparison.passed_baseline }}</td></tr>
+        <tr><td>Failed</td><td class="status-fail">{{ comparison.failed_baseline }}</td></tr>
+        <tr><td>Pass Rate</td><td>{{ comparison.pass_pct_baseline | fmt_pct }}</td></tr>
+        <tr><td>Health Score</td><td>{{ comparison.health_baseline | fmt_float(1) }}</td></tr>
+        <tr><td>Avg Response</td><td>{{ comparison.avg_rt_baseline | fmt_ms }}</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:14px;color:#566573;font-size:13px;text-transform:uppercase;">
+        Current Run
+      </h3>
+      <table class="info-table">
+        <tr><td>Run ID</td><td>{{ comparison.run_id_current | short_id }}</td></tr>
+        <tr><td>Timestamp</td><td>{{ comparison.timestamp_current[:19] }}</td></tr>
+        <tr>
+          <td>Passed</td>
+          <td class="status-pass">
+            {{ comparison.passed_current }}
+            <span class="comparison-delta {{ 'positive' if comparison.passed_delta >= 0 else 'negative' }}">
+              ({{ '%+d' | format(comparison.passed_delta) }})
+            </span>
+          </td>
+        </tr>
+        <tr>
+          <td>Failed</td>
+          <td class="status-fail">
+            {{ comparison.failed_current }}
+            <span class="comparison-delta {{ 'negative' if comparison.failed_delta > 0 else 'positive' }}">
+              ({{ '%+d' | format(comparison.failed_delta) }})
+            </span>
+          </td>
+        </tr>
+        <tr>
+          <td>Pass Rate</td>
+          <td>
+            {{ comparison.pass_pct_current | fmt_pct }}
+            <span class="comparison-delta {{ 'positive' if comparison.pass_pct_delta >= 0 else 'negative' }}">
+              ({{ '%+.1f' | format(comparison.pass_pct_delta) }}%)
+            </span>
+          </td>
+        </tr>
+        <tr><td>Health Score</td><td>{{ comparison.health_current | fmt_float(1) }}</td></tr>
+        <tr>
+          <td>Avg Response</td>
+          <td>{{ comparison.avg_rt_current | fmt_ms }}
+            {% if comparison.avg_rt_delta is not none %}
+            <span class="comparison-delta {{ 'negative' if comparison.avg_rt_delta > 0 else 'positive' }}">
+              ({{ '%+.1f' | format(comparison.avg_rt_delta) }} ms)
+            </span>
+            {% endif %}
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- New failures -->
+  {% if comparison.new_failures %}
+  <div class="card" style="margin-top:20px;">
+    <h3 style="color:var(--fail);margin-bottom:12px;">
+      🔴 New Failures ({{ comparison.new_failures | length }})
+    </h3>
+    <ul style="list-style:disc;padding-left:20px;line-height:2;">
+      {% for op in comparison.new_failures[:20] %}
+      <li><code>{{ op }}</code></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Fixed failures -->
+  {% if comparison.fixed_failures %}
+  <div class="card" style="margin-top:16px;">
+    <h3 style="color:var(--pass);margin-bottom:12px;">
+      ✅ Fixed Failures ({{ comparison.fixed_failures | length }})
+    </h3>
+    <ul style="list-style:disc;padding-left:20px;line-height:2;">
+      {% for op in comparison.fixed_failures[:20] %}
+      <li><code>{{ op }}</code></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</section>
+{% endif %}

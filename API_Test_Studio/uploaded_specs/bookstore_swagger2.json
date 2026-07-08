@@ -1,0 +1,285 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Book Store API",
+    "description": "A sample Swagger 2.0 specification for a book store.",
+    "version": "2.1.0",
+    "contact": {
+      "name": "Book Store Support",
+      "email": "support@bookstore.example.com"
+    }
+  },
+  "host": "api.bookstore.example.com",
+  "basePath": "/api",
+  "schemes": ["https"],
+  "consumes": ["application/json"],
+  "produces": ["application/json"],
+  "tags": [
+    { "name": "books",   "description": "Book catalogue operations" },
+    { "name": "authors", "description": "Author management" },
+    { "name": "orders",  "description": "Order processing" }
+  ],
+  "securityDefinitions": {
+    "ApiKeyAuth": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "X-API-Key"
+    },
+    "BearerAuth": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "Authorization"
+    }
+  },
+  "security": [
+    { "BearerAuth": [] }
+  ],
+  "paths": {
+    "/books": {
+      "get": {
+        "summary": "List all books",
+        "description": "Returns a paginated list of books with optional filters.",
+        "operationId": "listBooks",
+        "tags": ["books"],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number",
+            "required": false,
+            "type": "integer",
+            "default": 1
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of results per page",
+            "required": false,
+            "type": "integer",
+            "default": 25
+          },
+          {
+            "name": "genre",
+            "in": "query",
+            "description": "Filter by genre",
+            "required": false,
+            "type": "string",
+            "enum": ["fiction", "non-fiction", "science", "history", "biography"]
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sort order",
+            "required": false,
+            "type": "string",
+            "enum": ["title", "author", "published_date", "price"],
+            "default": "title"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of books",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "data": { "type": "array", "items": { "$ref": "#/definitions/Book" } },
+                "total": { "type": "integer" },
+                "page":  { "type": "integer" }
+              }
+            }
+          },
+          "400": { "description": "Bad request",    "schema": { "$ref": "#/definitions/Error" } },
+          "401": { "description": "Unauthorized",   "schema": { "$ref": "#/definitions/Error" } }
+        }
+      },
+      "post": {
+        "summary": "Create a book",
+        "description": "Add a new book to the catalogue.",
+        "operationId": "createBook",
+        "tags": ["books"],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "description": "Book data",
+            "schema": { "$ref": "#/definitions/NewBook" }
+          }
+        ],
+        "responses": {
+          "201": { "description": "Book created", "schema": { "$ref": "#/definitions/Book" } },
+          "400": { "description": "Validation error", "schema": { "$ref": "#/definitions/Error" } },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/books/{bookId}": {
+      "parameters": [
+        {
+          "name": "bookId",
+          "in": "path",
+          "required": true,
+          "description": "Unique book identifier",
+          "type": "integer"
+        }
+      ],
+      "get": {
+        "summary": "Get a book by ID",
+        "operationId": "getBookById",
+        "tags": ["books"],
+        "responses": {
+          "200": { "description": "Book details", "schema": { "$ref": "#/definitions/Book" } },
+          "404": { "description": "Book not found", "schema": { "$ref": "#/definitions/Error" } }
+        }
+      },
+      "put": {
+        "summary": "Update a book",
+        "operationId": "updateBook",
+        "tags": ["books"],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": { "$ref": "#/definitions/NewBook" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Book updated", "schema": { "$ref": "#/definitions/Book" } },
+          "404": { "description": "Book not found" }
+        }
+      },
+      "delete": {
+        "summary": "Delete a book",
+        "operationId": "deleteBook",
+        "tags": ["books"],
+        "responses": {
+          "204": { "description": "Book deleted" },
+          "404": { "description": "Book not found" }
+        }
+      }
+    },
+    "/authors": {
+      "get": {
+        "summary": "List all authors",
+        "operationId": "listAuthors",
+        "tags": ["authors"],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "description": "Filter by author name (partial match)",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of authors",
+            "schema": { "type": "array", "items": { "$ref": "#/definitions/Author" } }
+          }
+        }
+      }
+    },
+    "/orders": {
+      "post": {
+        "summary": "Place an order",
+        "operationId": "createOrder",
+        "tags": ["orders"],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "description": "Order details",
+            "schema": { "$ref": "#/definitions/NewOrder" }
+          }
+        ],
+        "responses": {
+          "201": { "description": "Order placed",    "schema": { "$ref": "#/definitions/Order" } },
+          "400": { "description": "Invalid order",   "schema": { "$ref": "#/definitions/Error" } },
+          "402": { "description": "Payment required" }
+        }
+      }
+    },
+    "/orders/{orderId}": {
+      "get": {
+        "summary": "Get order by ID",
+        "operationId": "getOrderById",
+        "tags": ["orders"],
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Order details", "schema": { "$ref": "#/definitions/Order" } },
+          "404": { "description": "Order not found" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Book": {
+      "type": "object",
+      "required": ["id", "title", "author_id", "price"],
+      "properties": {
+        "id":        { "type": "integer" },
+        "title":     { "type": "string" },
+        "author_id": { "type": "integer" },
+        "genre":     { "type": "string", "enum": ["fiction","non-fiction","science","history","biography"] },
+        "price":     { "type": "number", "format": "float" },
+        "isbn":      { "type": "string" },
+        "published": { "type": "string", "format": "date" }
+      }
+    },
+    "NewBook": {
+      "type": "object",
+      "required": ["title", "author_id", "price"],
+      "properties": {
+        "title":     { "type": "string" },
+        "author_id": { "type": "integer" },
+        "genre":     { "type": "string" },
+        "price":     { "type": "number" },
+        "isbn":      { "type": "string" }
+      }
+    },
+    "Author": {
+      "type": "object",
+      "properties": {
+        "id":         { "type": "integer" },
+        "name":       { "type": "string" },
+        "bio":        { "type": "string" },
+        "nationality":{ "type": "string" }
+      }
+    },
+    "Order": {
+      "type": "object",
+      "properties": {
+        "id":         { "type": "string" },
+        "book_ids":   { "type": "array", "items": { "type": "integer" } },
+        "total":      { "type": "number" },
+        "status":     { "type": "string", "enum": ["pending","confirmed","shipped","delivered"] }
+      }
+    },
+    "NewOrder": {
+      "type": "object",
+      "required": ["book_ids"],
+      "properties": {
+        "book_ids": { "type": "array", "items": { "type": "integer" } },
+        "promo_code": { "type": "string" }
+      }
+    },
+    "Error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code":    { "type": "integer" },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}

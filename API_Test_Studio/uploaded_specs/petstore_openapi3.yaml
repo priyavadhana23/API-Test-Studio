@@ -1,0 +1,223 @@
+openapi: "3.0.3"
+info:
+  title: Pet Store API
+  description: A sample OpenAPI 3.0 specification for a pet store.
+  version: "1.0.0"
+servers:
+  - url: https://api.petstore.example.com/v1
+tags:
+  - name: pets
+    description: Everything about pets
+  - name: users
+    description: User management
+security:
+  - BearerAuth: []
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Pet:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: "Fido"
+        tag:
+          type: string
+          enum: [dog, cat, bird, fish]
+        status:
+          type: string
+          enum: [available, pending, sold]
+          default: available
+    NewPet:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        tag:
+          type: string
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+paths:
+  /pets:
+    get:
+      summary: List all pets
+      description: Returns a paginated list of all pets in the store.
+      operationId: listPets
+      tags: [pets]
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of pets to return
+          required: false
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          description: Filter by pet status
+          required: false
+          schema:
+            type: string
+            enum: [available, pending, sold]
+        - name: X-Request-ID
+          in: header
+          description: Optional idempotency key
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A list of pets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Pet"
+        "400":
+          description: Bad request
+        "401":
+          description: Unauthorized
+    post:
+      summary: Create a pet
+      description: Adds a new pet to the store.
+      operationId: createPet
+      tags: [pets]
+      requestBody:
+        required: true
+        description: Pet object to create
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewPet"
+      responses:
+        "201":
+          description: Pet created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pet"
+        "400":
+          description: Invalid input
+        "401":
+          description: Unauthorized
+  /pets/{petId}:
+    get:
+      summary: Get a pet by ID
+      operationId: getPetById
+      tags: [pets]
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          description: Unique identifier of the pet
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Pet details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pet"
+        "404":
+          description: Pet not found
+    put:
+      summary: Update a pet
+      operationId: updatePet
+      tags: [pets]
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewPet"
+      responses:
+        "200":
+          description: Pet updated
+        "404":
+          description: Pet not found
+    delete:
+      summary: Delete a pet
+      operationId: deletePet
+      tags: [pets]
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Pet deleted successfully
+        "404":
+          description: Pet not found
+  /users:
+    post:
+      summary: Register a new user
+      operationId: createUser
+      tags: [users]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+      responses:
+        "201":
+          description: User registered
+        "400":
+          description: Validation error
+  /users/{userId}:
+    get:
+      summary: Get user by ID
+      operationId: getUserById
+      tags: [users]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: User not found

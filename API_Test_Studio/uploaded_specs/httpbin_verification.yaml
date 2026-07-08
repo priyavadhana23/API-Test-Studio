@@ -1,0 +1,206 @@
+openapi: "3.0.3"
+info:
+  title: HTTPBin Verification API
+  description: >
+    Public HTTP testing service used to verify Phase 4 execution engine.
+    httpbin.org returns predictable responses for all standard HTTP methods,
+    making it ideal for integration verification without a live application.
+  version: "1.0.0"
+servers:
+  - url: https://httpbin.org
+tags:
+  - name: methods
+    description: HTTP method verification
+  - name: status
+    description: HTTP status code responses
+  - name: request-inspection
+    description: Request echo and inspection
+paths:
+  /get:
+    get:
+      summary: GET request inspector
+      description: Returns the incoming GET request's query params, headers, and origin IP.
+      operationId: getRequest
+      tags: [methods]
+      parameters:
+        - name: message
+          in: query
+          required: false
+          description: An optional message echoed back in the response
+          schema:
+            type: string
+            example: "hello"
+        - name: count
+          in: query
+          required: false
+          description: A numeric parameter
+          schema:
+            type: integer
+            default: 1
+      responses:
+        "200":
+          description: Successful response echoing request details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  args:    { type: object }
+                  headers: { type: object }
+                  origin:  { type: string }
+                  url:     { type: string }
+        "400":
+          description: Bad request
+
+  /post:
+    post:
+      summary: POST request inspector
+      description: Returns the incoming POST request body as JSON.
+      operationId: postRequest
+      tags: [methods]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: "API Test Studio"
+                value:
+                  type: integer
+                  example: 42
+      responses:
+        "200":
+          description: Request body echoed back
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  json: { type: object }
+                  data: { type: string }
+        "400":
+          description: Bad request
+
+  /put:
+    put:
+      summary: PUT request inspector
+      description: Returns the incoming PUT request body.
+      operationId: putRequest
+      tags: [methods]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 1
+                status:
+                  type: string
+                  enum: [active, inactive, pending]
+                  example: active
+      responses:
+        "200":
+          description: Request echoed back
+        "400":
+          description: Bad request
+
+  /patch:
+    patch:
+      summary: PATCH request inspector
+      operationId: patchRequest
+      tags: [methods]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                field:
+                  type: string
+                  example: "updated_value"
+      responses:
+        "200":
+          description: Request echoed back
+
+  /delete:
+    delete:
+      summary: DELETE request inspector
+      operationId: deleteRequest
+      tags: [methods]
+      responses:
+        "200":
+          description: DELETE confirmed
+
+  /status/{code}:
+    get:
+      summary: Returns a response with the specified HTTP status code
+      description: >
+        Use this to verify the executor correctly captures any status code.
+        Useful for testing error handling paths.
+      operationId: getStatus
+      tags: [status]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: HTTP status code to return (e.g. 200, 404, 500)
+          schema:
+            type: integer
+            example: 200
+      responses:
+        "200": { description: OK }
+        "400": { description: Bad Request }
+        "401": { description: Unauthorized }
+        "403": { description: Forbidden }
+        "404": { description: Not Found }
+        "500": { description: Internal Server Error }
+
+  /headers:
+    get:
+      summary: Returns the request headers
+      operationId: getHeaders
+      tags: [request-inspection]
+      parameters:
+        - name: X-Custom-Header
+          in: header
+          required: false
+          schema:
+            type: string
+            example: "test-value"
+      responses:
+        "200":
+          description: Request headers echoed back
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  headers: { type: object }
+
+  /delay/{seconds}:
+    get:
+      summary: Delayed response (tests timeout handling)
+      description: >
+        Response is delayed by the specified number of seconds.
+        Use seconds=1 to verify normal operation.
+        Use seconds=35 to trigger timeout (above default 30s limit).
+      operationId: getDelay
+      tags: [request-inspection]
+      parameters:
+        - name: seconds
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 1
+      responses:
+        "200":
+          description: Delayed response returned successfully

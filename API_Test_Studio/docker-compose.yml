@@ -1,0 +1,108 @@
+# =============================================================================
+# API Test Studio — Docker Compose
+# Full platform orchestration: FastAPI backend + React/Nginx frontend
+#
+# Start:    docker compose up --build
+# Stop:     docker compose down
+# Logs:     docker compose logs -f
+# Rebuild:  docker compose build --no-cache
+# =============================================================================
+
+services:
+
+  # ── Backend (FastAPI + Uvicorn) ─────────────────────────────────────────────
+  backend:
+    build:
+      context: .                        # API_Test_Studio/ root
+      dockerfile: Dockerfile            # Phase 10.1 backend Dockerfile
+    image: api-test-studio-backend
+    container_name: ats-backend
+    restart: unless-stopped
+
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"    # host port configurable via .env
+
+    environment:
+      # Bind to all interfaces inside the container
+      BACKEND_HOST:        "0.0.0.0"
+      BACKEND_PORT:        "8000"
+      BACKEND_RELOAD:      "false"
+      LOG_LEVEL:           "${LOG_LEVEL:-info}"
+      API_ENVIRONMENT:     "${API_ENVIRONMENT:-development}"
+      # Allow the frontend container to call the API
+      # CORS_ORIGINS includes both the host-mapped port and the Docker service name
+      CORS_ORIGINS: >-
+        http://localhost:${FRONTEND_PORT:-80},
+        http://localhost:3000,
+        http://localhost:5173,
+        http://frontend:80,
+        http://127.0.0.1:${FRONTEND_PORT:-80}
+
+    volumes:
+      # Named volumes — data persists across "docker compose down / up"
+      - ats-database:/app/database
+      - ats-uploaded-specs:/app/uploaded_specs
+      - ats-reports:/app/reports
+      - ats-history:/app/history
+      - ats-logs:/app/logs
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+
+    networks:
+      - ats-network
+
+  # ── Frontend (React + Vite build → Nginx) ──────────────────────────────────
+  frontend:
+    build:
+      context: ./web_dashboard/frontend  # Phase 10.2 frontend Dockerfile
+      dockerfile: Dockerfile
+      args:
+        # Baked into the JS bundle at build time by Vite.
+        # Uses the Docker service name so the browser-side JS never calls
+        # localhost — Nginx proxies /api/* to http://backend:8000 instead,
+        # so this can remain empty (Nginx handles routing internally).
+        VITE_API_BASE_URL:  ""
+        VITE_APP_NAME:      "${VITE_APP_NAME:-API Test Studio}"
+        VITE_APP_VERSION:   "${VITE_APP_VERSION:-1.0.0}"
+    image: api-test-studio-frontend
+    container_name: ats-frontend
+    restart: unless-stopped
+
+    ports:
+      - "${FRONTEND_PORT:-80}:80"       # host port configurable via .env
+
+    depends_on:
+      backend:
+        condition: service_healthy      # wait for backend /api/health → 200
+
+    networks:
+      - ats-network
+
+# ── Named volumes ─────────────────────────────────────────────────────────────
+# Docker manages these on the host.  Data survives "docker compose down".
+# Use "docker compose down -v" ONLY when you want to wipe all data.
+volumes:
+  ats-database:
+    name: ats-database
+  ats-uploaded-specs:
+    name: ats-uploaded-specs
+  ats-reports:
+    name: ats-reports
+  ats-history:
+    name: ats-history
+  ats-logs:
+    name: ats-logs
+
+# ── Network ───────────────────────────────────────────────────────────────────
+# Dedicated bridge network.  Containers resolve each other by service name:
+#   frontend → backend resolves to http://backend:8000 (inside Nginx config)
+#   backend  → (no outbound dependency)
+networks:
+  ats-network:
+    name: ats-network
+    driver: bridge

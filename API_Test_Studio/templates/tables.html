@@ -1,0 +1,111 @@
+{# ── Validator Summary Section ─────────────────────────── #}
+{% if val_summary and val_summary.validators %}
+<section class="section" id="validators">
+  <h2 class="section-title">Validator Statistics</h2>
+  <div class="card">
+    <div class="data-table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Validator</th>
+            <th>Passed</th>
+            <th>Failed</th>
+            <th>Total</th>
+            <th>Pass Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in val_summary.validators %}
+          <tr>
+            <td><strong>{{ v.validator_name }}</strong></td>
+            <td class="status-pass">{{ v.passed }}</td>
+            <td class="status-fail">{{ v.failed }}</td>
+            <td>{{ v.total }}</td>
+            <td>{{ v.pass_rate | fmt_pct }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr style="background:#F4F6F7;font-weight:700;">
+            <td>TOTAL</td>
+            <td class="status-pass">{{ val_summary.total_passed }}</td>
+            <td class="status-fail">{{ val_summary.total_failed }}</td>
+            <td>{{ val_summary.total_assertions }}</td>
+            <td>
+              {% if val_summary.total_assertions > 0 %}
+              {{ (val_summary.total_passed / val_summary.total_assertions * 100) | fmt_pct }}
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# ── Detailed Test Results Table ──────────────────────── #}
+{% if detailed and detailed.rows %}
+<section class="section" id="test-results">
+  <h2 class="section-title">Detailed Test Results</h2>
+
+  <div class="table-controls">
+    <input type="text" id="searchInput" placeholder="Search endpoint, operation, reason…"
+           oninput="filterTable()" style="width:260px;"/>
+    <select id="statusFilter" onchange="filterTable()">
+      <option value="">All Statuses</option>
+      <option value="passed">Passed</option>
+      <option value="failed">Failed</option>
+      <option value="error">Error</option>
+      <option value="skipped">Skipped</option>
+    </select>
+    <select id="categoryFilter" onchange="filterTable()">
+      <option value="">All Categories</option>
+      <option value="positive">Positive</option>
+      <option value="negative">Negative</option>
+      <option value="boundary">Boundary</option>
+      <option value="security">Security</option>
+    </select>
+    <span class="result-count" id="rowCount">
+      Showing {{ detailed.total }} of {{ detailed.total }} results
+    </span>
+  </div>
+
+  <div class="data-table-wrap">
+    <table class="data-table" id="resultsTable">
+      <thead>
+        <tr>
+          <th onclick="sortTable(0)">Operation ID ↕</th>
+          <th onclick="sortTable(1)">Endpoint ↕</th>
+          <th onclick="sortTable(2)">Method</th>
+          <th onclick="sortTable(3)">Category</th>
+          <th onclick="sortTable(4)">HTTP Code</th>
+          <th onclick="sortTable(5)">Resp. Time ↕</th>
+          <th onclick="sortTable(6)">Status ↕</th>
+          <th>Failure Reason</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        {% for row in detailed.rows %}
+        <tr>
+          <td title="{{ row.operation_id }}">{{ row.operation_id | truncate_url(24) }}</td>
+          <td title="{{ row.endpoint }}">{{ row.endpoint | truncate_url(28) }}</td>
+          <td><code>{{ row.method }}</code></td>
+          <td>{{ row.category | default('—') }}</td>
+          <td>{{ row.response_status_code | default('—') }}</td>
+          <td>{{ row.response_time_ms | fmt_ms }}</td>
+          <td>
+            <span class="{{ row.validation_status | status_class }}">
+              {{ row.validation_status | upper }}
+            </span>
+          </td>
+          <td title="{{ row.failure_reason }}">
+            {{ row.failure_reason | truncate_url(50) if row.failure_reason else '—' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
