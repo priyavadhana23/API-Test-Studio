@@ -63,14 +63,17 @@ class Settings:
         self.history_dir: str = str(_PROJECT_ROOT / cfg.get_path("history"))
 
         # ── CORS ─────────────────────────────────────────────────────
-        # Allow localhost dev origins by default; override via env var
-        # CORS_ORIGINS="http://host1,http://host2" in production.
+        # Production deployment URLs are baked into the default list so the
+        # backend works on Render without any extra environment variable.
+        # The full list can still be overridden via the CORS_ORIGINS env var
+        # (comma-separated) for custom deployments.
         import os
         cors_env = os.environ.get("CORS_ORIGINS", "")
         if cors_env:
-            self.cors_origins: List[str] = [o.strip() for o in cors_env.split(",")]
+            self.cors_origins: List[str] = [o.strip() for o in cors_env.split(",") if o.strip()]
         else:
             self.cors_origins = [
+                # ── Local development ──────────────────────────────
                 "http://localhost",
                 "http://localhost:3000",
                 "http://localhost:5173",
@@ -79,6 +82,8 @@ class Settings:
                 "http://127.0.0.1:3000",
                 "http://127.0.0.1:5173",
                 "http://127.0.0.1:8080",
+                # ── Production (Vercel) ────────────────────────────
+                "https://api-test-studio.vercel.app",
             ]
 
         # ── Server defaults ──────────────────────────────────────────
