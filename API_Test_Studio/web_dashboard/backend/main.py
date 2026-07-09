@@ -144,9 +144,17 @@ app = FastAPI(
 
 # 1. CORS — must be first so preflight OPTIONS requests are handled before
 #    any other middleware inspects them.
+#
+#    allow_origins covers the explicit list from settings (localhost + the
+#    production Vercel domain).
+#
+#    allow_origin_regex additionally permits every Vercel preview deployment
+#    URL (e.g. https://api-test-studio-abc123-org.vercel.app) without
+#    enumerating them, since each preview gets a unique subdomain.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
