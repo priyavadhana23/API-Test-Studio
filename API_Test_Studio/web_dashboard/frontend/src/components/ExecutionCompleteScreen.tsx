@@ -2,7 +2,8 @@
 // Shown after the job reaches status === 'completed'.
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, Paper, Button, Grid, Divider, LinearProgress, Chip,
+  Box, Typography, Paper, Button, Grid, Divider, LinearProgress,
+  Chip, Alert,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
@@ -25,17 +26,35 @@ function ms(v: number | null | undefined) {
 export default function ExecutionCompleteScreen({ job, run, onRunAnother }: Props) {
   const navigate = useNavigate();
   const runId = job.run_id!;
+  const totalTests = run?.total_test_cases ?? run?.total_executed ?? 0;
 
   return (
     <Box sx={{ maxWidth: 680, mx: 'auto', mt: 4 }}>
+      {/* ── Success banner ───────────────────────────────────────── */}
+      <Alert
+        severity="success"
+        icon={<CheckCircleIcon fontSize="inherit" />}
+        sx={{ mb: 3, borderRadius: 2, fontSize: '0.95rem', fontWeight: 500 }}
+      >
+        <Typography variant="body1" fontWeight={700}>
+          Execution completed successfully.
+        </Typography>
+        <Typography variant="body2" sx={{ mt: 0.25 }}>
+          {totalTests > 0
+            ? `${totalTests.toLocaleString()} automated test case${totalTests !== 1 ? 's' : ''} executed. Reports and analytics are ready.`
+            : 'Reports and analytics are ready. View the full results below.'}
+        </Typography>
+      </Alert>
+
       <Paper sx={{ p: 4, borderRadius: 3 }}>
-        {/* Success header */}
+        {/* Header */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-          <CheckCircleIcon sx={{ color: 'success.main', fontSize: 40 }} />
+          <CheckCircleIcon sx={{ color: 'success.main', fontSize: 36 }} />
           <Box>
-            <Typography variant="h6">Execution Complete</Typography>
+            <Typography variant="h6">{run?.api_name ?? job.spec_filename}</Typography>
             <Typography variant="body2" color="text.secondary">
-              {run?.api_name ?? job.spec_filename} — {job.environment}
+              Environment: {job.environment}
+              {job.elapsed_s != null && ` · Completed in ${job.elapsed_s.toFixed(1)} s`}
             </Typography>
           </Box>
           {run && (
@@ -51,8 +70,8 @@ export default function ExecutionCompleteScreen({ job, run, onRunAnother }: Prop
         {run && (
           <Box sx={{ mb: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-              <Typography variant="body2" color="text.secondary">Pass Rate</Typography>
-              <Typography variant="body2" fontWeight={600}>{run.pass_percentage.toFixed(1)}%</Typography>
+              <Typography variant="body2" color="text.secondary">Overall Test Success Rate</Typography>
+              <Typography variant="body2" fontWeight={700}>{run.pass_percentage.toFixed(1)}%</Typography>
             </Box>
             <LinearProgress
               variant="determinate"
@@ -67,16 +86,18 @@ export default function ExecutionCompleteScreen({ job, run, onRunAnother }: Prop
         {run && (
           <Grid container spacing={2} sx={{ mb: 3 }}>
             {[
-              { label: 'Run ID',       value: run.run_id.slice(0, 18) + '…', mono: true },
-              { label: 'API Name',     value: run.api_name },
-              { label: 'Environment',  value: run.environment ?? '—' },
-              { label: 'Total Tests',  value: run.total_executed },
-              { label: 'Passed',       value: run.passed,  color: '#34a853' },
-              { label: 'Failed',       value: run.failed,  color: '#ea4335' },
-              { label: 'Errors',       value: run.errors,  color: '#ff9800' },
-              { label: 'Skipped',      value: run.skipped, color: '#9e9e9e' },
-              { label: 'Avg RT',       value: ms(run.avg_response_time_ms) },
-              { label: 'Exec Time',    value: run.total_execution_time_s != null ? `${run.total_execution_time_s.toFixed(1)} s` : (job.elapsed_s != null ? `${job.elapsed_s.toFixed(1)} s` : '—') },
+              { label: 'Run ID',          value: run.run_id.slice(0, 18) + '…', mono: true },
+              { label: 'API Name',        value: run.api_name },
+              { label: 'Environment',     value: run.environment ?? '—' },
+              { label: 'Total Tests',     value: run.total_executed },
+              { label: 'Passed',          value: run.passed,  color: '#2e7d32' },
+              { label: 'Validation Failures', value: run.failed, color: run.failed > 0 ? '#e65100' : undefined },
+              { label: 'Execution Errors',    value: run.errors, color: run.errors > 0 ? '#c62828' : undefined },
+              { label: 'Skipped',         value: run.skipped, color: '#757575' },
+              { label: 'Avg RT',          value: ms(run.avg_response_time_ms) },
+              { label: 'Exec Time',       value: run.total_execution_time_s != null
+                ? `${run.total_execution_time_s.toFixed(1)} s`
+                : (job.elapsed_s != null ? `${job.elapsed_s.toFixed(1)} s` : '—') },
             ].map(({ label, value, color, mono }) => (
               <Grid item xs={6} sm={4} key={label}>
                 <Box sx={{ p: 1.5, bgcolor: '#f8f9fa', borderRadius: 1.5 }}>
@@ -84,7 +105,11 @@ export default function ExecutionCompleteScreen({ job, run, onRunAnother }: Prop
                   <Typography
                     variant="subtitle2"
                     fontWeight={700}
-                    sx={{ color: color ?? 'text.primary', fontFamily: mono ? 'monospace' : undefined, fontSize: mono ? '0.75rem' : undefined }}
+                    sx={{
+                      color: color ?? 'text.primary',
+                      fontFamily: mono ? 'monospace' : undefined,
+                      fontSize: mono ? '0.75rem' : undefined,
+                    }}
                   >
                     {String(value)}
                   </Typography>
@@ -103,7 +128,7 @@ export default function ExecutionCompleteScreen({ job, run, onRunAnother }: Prop
             startIcon={<OpenInNewIcon />}
             onClick={() => navigate(`/runs/${runId}`)}
           >
-            View Run
+            View Run Details
           </Button>
           <Button
             variant="outlined"

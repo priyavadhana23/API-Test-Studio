@@ -71,7 +71,7 @@ export default function MainLayout() {
 
       <Divider />
       <Box sx={{ px: 2.5, py: 1.5 }}>
-        <Typography variant="caption" color="text.disabled">Phase 9.6 — Upload &amp; Execute</Typography>
+        <Typography variant="caption" color="text.disabled">Enterprise QA Dashboard v1.0</Typography>
       </Box>
     </Box>
   );

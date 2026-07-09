@@ -1,5 +1,6 @@
 import { Card, CardContent, Typography, Box, Skeleton } from '@mui/material';
 import type { ReactNode } from 'react';
+import MetricTooltip from './MetricTooltip';
 
 interface Props {
   title: string;
@@ -8,17 +9,25 @@ interface Props {
   icon?: ReactNode;
   color?: string;
   loading?: boolean;
+  tooltip?: string;   // ⓘ explanation shown on hover
 }
 
-export default function StatCard({ title, value, subtitle, icon, color = '#1a73e8', loading }: Props) {
+export default function StatCard({ title, value, subtitle, icon, color = '#1a73e8', loading, tooltip }: Props) {
   return (
     <Card sx={{ height: '100%' }}>
       <CardContent sx={{ p: 2.5 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
-              {title}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}
+              >
+                {title}
+              </Typography>
+              {tooltip && <MetricTooltip text={tooltip} />}
+            </Box>
             {loading ? (
               <Skeleton width={80} height={40} sx={{ mt: 0.5 }} />
             ) : (
